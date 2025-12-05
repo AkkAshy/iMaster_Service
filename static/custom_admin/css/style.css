@@ -1,0 +1,157 @@
+.dashboard h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.filter-btn {
+    background-color: #e0e0e0;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 15px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.filter-btn:hover {
+    background-color: #d0d0d0;
+}
+
+.category-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.category-item {
+    margin-bottom: 10px;
+}
+
+.category-item a {
+    display: flex;
+    align-items: center;
+    background-color: #e3f2fd;
+    padding: 10px;
+    border-radius: 5px;
+    text-decoration: none;
+    color: #333;
+    transition: background-color 0.3s;
+}
+
+.category-item a:hover {
+    background-color: #d1e7ff;
+}
+
+.category-item .icon {
+    margin-right: 10px;
+    font-size: 16px;
+}
+
+/* Разные цвета для категорий */
+.category-item:nth-child(1) a { background-color: #e3f2fd; } /* Корпуса */
+.category-item:nth-child(2) a { background-color: #ffebee; } /* Факультеты */
+.category-item:nth-child(3) a { background-color: #e8f5e9; } /* Этажи */
+.category-item:nth-child(4) a { background-color: #f3e5f5; } /* Кабинеты */
+.category-item:nth-child(5) a { background-color: #fff3e0; } /* Типы оборудования */
+.category-item:nth-child(6) a { background-color: #e0f7fa; } /* Оборудование */
+.category-item:nth-child(7) a { background-color: #f9fbea; } /* Договоры */
+.category-item:nth-child(8) a { background-color: #fce4ec; } /* Пользователи */
+.category-item:nth-child(9) a { background-color: #e0f2f1; } /* Перемещения */
+
+.client-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.client-table th,
+.client-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.client-table th {
+    background-color: #f5f5f5;
+    font-weight: 600;
+}
+
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.filter-section {
+    margin-bottom: 20px;
+}
+
+.filter-hint {
+    font-size: 14px;
+    color: #888;
+    margin-bottom: 10px;
+    font-style: italic;
+}
+
+.filter-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.filter-btn {
+    background-color: #e0e0e0;
+    border: 1px solid #d0d0d0;
+    padding: 5px 15px;
+    border-radius: 15px;
+    font-size: 14px;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+    background-color: #d0d0d0;
+    color: #333;
+}
+
+.filter-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+select[name="filter"] {
+    padding: 5px 10px;
+    border: 1px solid #d0d0d0;
+    border-radius: 5px;
+    font-size: 14px;
+    background-color: #fff;
+    color: #333;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+select[name="filter"]:hover {
+    border-color: #4a90e2;
+}
+
+select[name="filter"]:focus {
+    outline: none;
+    border-color: #4a90e2;
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.3);
+}
+
+.status-dot.green { background-color: #4caf50; }
+.status-dot.red { background-color: #f44336; }
+.status-dot.yellow { background-color: #ffeb3b; }

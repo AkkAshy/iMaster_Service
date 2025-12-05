@@ -1,0 +1,1664 @@
+{
+  "info": {
+    "name": "Inventory Master API",
+    "description": "Полная коллекция API для системы управления инвентарём университета.\n\n## Роли\n- **admin**: Полный доступ\n- **manager**: Чтение всего, создание, редактирование своего, DELETE запрещён\n- **user**: Только чтение\n\n## Авторизация\nИспользуется JWT. Получите токен через `/api/auth/token/` и добавьте в заголовок:\n`Authorization: Bearer {{access_token}}`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "room_uid",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "equipment_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "description": "Авторизация и управление токенами",
+      "item": [
+        {
+          "name": "Login (Get Tokens)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', jsonData.access);",
+                  "    pm.collectionVariables.set('refresh_token', jsonData.refresh);",
+                  "    console.log('Tokens saved!');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/token/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "token", ""]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', jsonData.access);",
+                  "    console.log('Access token refreshed!');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/token/refresh/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "token", "refresh", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 Users",
+      "description": "Управление пользователями",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/user/users/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", ""]
+            }
+          }
+        },
+        {
+          "name": "Create User (Admin only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"newuser\",\n    \"email\": \"newuser@example.com\",\n    \"first_name\": \"Иван\",\n    \"last_name\": \"Иванов\",\n    \"password\": \"password123\",\n    \"role\": \"user\",\n    \"phone_number\": \"+998901234567\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/users/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", ""]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/user/users/1/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "1", ""]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Обновлённое имя\",\n    \"phone_number\": \"+998909876543\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/users/1/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "1", ""]
+            }
+          }
+        },
+        {
+          "name": "Get Current User (me)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/user/users/me/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "me", ""]
+            }
+          }
+        },
+        {
+          "name": "Update Current User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Моё новое имя\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/users/update-me/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "update-me", ""]
+            }
+          }
+        },
+        {
+          "name": "Toggle User Active",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/user/users/2/toggle-active/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "2", "toggle-active", ""]
+            }
+          }
+        },
+        {
+          "name": "Get User History (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/user/users/1/history/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "1", "history", ""]
+            }
+          }
+        },
+        {
+          "name": "Get My History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/user/users/my-history/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "my-history", ""]
+            }
+          }
+        },
+        {
+          "name": "Get My History (with filters)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/user/users/my-history/?action_type=CREATE_EQUIPMENT&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "my-history", ""],
+              "query": [
+                {"key": "action_type", "value": "CREATE_EQUIPMENT"},
+                {"key": "limit", "value": "10"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete User (Admin only)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/user/users/2/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "2", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏛️ University",
+      "description": "Структура университета",
+      "item": [
+        {
+          "name": "Universities",
+          "item": [
+            {
+              "name": "List Universities",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/universities/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "universities", ""]
+                }
+              }
+            },
+            {
+              "name": "Create University",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"СамВМИ\",\n    \"address\": \"г. Самарканд, ул. Амира Темура, 18\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/universities/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "universities", ""]
+                }
+              }
+            },
+            {
+              "name": "Get University",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/universities/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "universities", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Update University",
+              "request": {
+                "method": "PATCH",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Обновлённое название\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/universities/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "universities", "1", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buildings",
+          "item": [
+            {
+              "name": "List Buildings",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/buildings/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "buildings", ""]
+                }
+              }
+            },
+            {
+              "name": "List Buildings (filter by university)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/buildings/?university=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "buildings", ""],
+                  "query": [{"key": "university", "value": "1"}]
+                }
+              }
+            },
+            {
+              "name": "Create Building",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Главный корпус\",\n    \"address\": \"г. Самарканд, ул. Амира Темура, 18\",\n    \"university\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/buildings/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "buildings", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Building",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/buildings/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "buildings", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Search Buildings",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/buildings/?search=главный",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "buildings", ""],
+                  "query": [{"key": "search", "value": "главный"}]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Floors",
+          "item": [
+            {
+              "name": "List Floors",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/floors/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "floors", ""]
+                }
+              }
+            },
+            {
+              "name": "List Floors (filter by building)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/floors/?building=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "floors", ""],
+                  "query": [{"key": "building", "value": "1"}]
+                }
+              }
+            },
+            {
+              "name": "Create Floor",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"number\": 1,\n    \"description\": \"Первый этаж\",\n    \"building\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/floors/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "floors", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rooms",
+          "item": [
+            {
+              "name": "List Rooms",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", ""]
+                }
+              }
+            },
+            {
+              "name": "List Rooms (filter by building & floor)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/?building=1&floor=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", ""],
+                  "query": [
+                    {"key": "building", "value": "1"},
+                    {"key": "floor", "value": "1"}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create Room",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"number\": \"101\",\n    \"name\": \"Серверная\",\n    \"building\": 1,\n    \"floor\": 1,\n    \"is_special\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Room",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Room Link",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/link/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", "link", ""]
+                }
+              }
+            },
+            {
+              "name": "Split Room",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"new_rooms\": [\n        {\"number\": \"101A\"},\n        {\"number\": \"101B\"}\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/split/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", "split", ""]
+                }
+              }
+            },
+            {
+              "name": "Merge Rooms",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"room_ids\": [2, 3],\n    \"number\": \"101-102\",\n    \"floor_id\": 1,\n    \"building_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/merge/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "merge", ""]
+                }
+              }
+            },
+            {
+              "name": "Move Room",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"floor_id\": 2,\n    \"building_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/move/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", "move", ""]
+                }
+              }
+            },
+            {
+              "name": "My Room Actions",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/my-actions/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "my-actions", ""]
+                }
+              }
+            },
+            {
+              "name": "Scan Room QR",
+              "description": "Сканирование QR-кода кабинета. Возвращает кабинет с полным списком оборудования.",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/scan/{{room_uid}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "scan", "{{room_uid}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Download Room PDF",
+              "description": "Скачать инвентаризационную ведомость кабинета в PDF формате.",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/pdf/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", "pdf", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Faculties",
+          "item": [
+            {
+              "name": "List Faculties",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Faculty",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Факультет информатики\",\n    \"building\": 1,\n    \"floor\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", ""]
+                }
+              }
+            },
+            {
+              "name": "Split Faculty",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"new_faculties\": [\n        {\"name\": \"Кафедра программирования\", \"floor_id\": 1},\n        {\"name\": \"Кафедра сетей\", \"floor_id\": 2}\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/1/split/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", "1", "split", ""]
+                }
+              }
+            },
+            {
+              "name": "Merge Faculties",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"faculty_ids\": [2, 3],\n    \"name\": \"Объединённый факультет\",\n    \"building_id\": 1,\n    \"floor_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/merge/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", "merge", ""]
+                }
+              }
+            },
+            {
+              "name": "Move Faculty",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"floor_id\": 2,\n    \"building_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/1/move/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", "1", "move", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Warehouses",
+          "item": [
+            {
+              "name": "List Warehouses",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/warehouses/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "warehouses", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Warehouse",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Главный склад\",\n    \"address\": \"г. Самарканд, ул. Амира Темура, 18\",\n    \"description\": \"Основной склад оборудования\",\n    \"is_main\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/warehouses/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "warehouses", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Main Warehouse",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/warehouses/main/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "warehouses", "main", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📦 Inventory",
+      "description": "Управление оборудованием",
+      "item": [
+        {
+          "name": "Equipment Types",
+          "item": [
+            {
+              "name": "List Types",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/types/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "types", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Type",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Компьютер\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/types/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "types", ""]
+                }
+              }
+            },
+            {
+              "name": "Search Types",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/types/?search=комп",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "types", ""],
+                  "query": [{"key": "search", "value": "комп"}]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Specifications (Templates)",
+          "item": [
+            {
+              "name": "List Specifications",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Specification (Russian keys)",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"template\": {\n        \"Процессор\": {\"type\": \"string\", \"required\": true},\n        \"ОЗУ (ГБ)\": {\"type\": \"integer\", \"default\": 8},\n        \"Wi-Fi\": {\"type\": \"boolean\", \"default\": true},\n        \"Тип диска\": {\"type\": \"choice\", \"choices\": [\"SSD\", \"HDD\"]}\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Specification by Type",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/by-type/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", "by-type", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Form for Type (for frontend)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/form/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", "form", "1", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Equipment",
+          "item": [
+            {
+              "name": "List Equipment",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "List Equipment (with expand)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/?expand=type,room,warehouse,author",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""],
+                  "query": [{"key": "expand", "value": "type,room,warehouse,author"}]
+                }
+              }
+            },
+            {
+              "name": "List Equipment (with filters)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/?status=in_use&type=1&room=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""],
+                  "query": [
+                    {"key": "status", "value": "in_use"},
+                    {"key": "type", "value": "1"},
+                    {"key": "room", "value": "1"}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "List Equipment (search)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/?search=Dell",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""],
+                  "query": [{"key": "search", "value": "Dell"}]
+                }
+              }
+            },
+            {
+              "name": "Create Equipment",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"name\": \"Компьютер Dell OptiPlex\",\n    \"inn\": \"INV-2024-001\",\n    \"description\": \"Офисный компьютер\",\n    \"specs\": {\n        \"protsessor\": \"Intel Core i7-12700\",\n        \"ozu_gb\": 16,\n        \"wifi\": true,\n        \"tip_diska\": \"SSD\"\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Equipment (with expand)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/?expand=type,room,author,repair,disposal",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", ""],
+                  "query": [{"key": "expand", "value": "type,room,author,repair,disposal"}]
+                }
+              }
+            },
+            {
+              "name": "Update Equipment",
+              "request": {
+                "method": "PATCH",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Обновлённое название\",\n    \"description\": \"Новое описание\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Scan QR (by INN)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/scan/INV-2024-001/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "scan", "INV-2024-001", ""]
+                }
+              }
+            },
+            {
+              "name": "Scan QR (by UID)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/scan/550e8400-e29b-41d4-a716-446655440000/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "scan", "550e8400-e29b-41d4-a716-446655440000", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "FSM Actions",
+          "description": "Изменение статуса оборудования через FSM",
+          "item": [
+            {
+              "name": "Assign to Room (Warehouse → Room)",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"room\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/assign-to-room/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", "assign-to-room", ""]
+                }
+              }
+            },
+            {
+              "name": "Start Use (in_stock → in_use)",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/start-use/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", "start-use", ""]
+                }
+              }
+            },
+            {
+              "name": "Send to Repair (in_use → in_repair)",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/send-to-repair/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", "send-to-repair", ""]
+                }
+              }
+            },
+            {
+              "name": "Complete Repair (in_repair → in_use)",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/complete-repair/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", "complete-repair", ""]
+                }
+              }
+            },
+            {
+              "name": "Return to Warehouse",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/return-to-warehouse/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", "return-to-warehouse", ""]
+                }
+              }
+            },
+            {
+              "name": "Dispose (→ disposed)",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/dispose/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", "dispose", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk Operations",
+          "item": [
+            {
+              "name": "Bulk Create Equipment",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"name\": \"Компьютер Dell\",\n    \"count\": 5,\n    \"use_template\": true,\n    \"specs\": {\n        \"protsessor\": \"Intel Core i5\",\n        \"ozu_gb\": 8\n    },\n    \"inns\": [\"INV-001\", \"INV-002\", \"INV-003\", \"INV-004\", \"INV-005\"]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/bulk-create/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "bulk-create", ""]
+                }
+              }
+            },
+            {
+              "name": "Bulk Create (without INNs)",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"name\": \"Монитор Samsung\",\n    \"count\": 10,\n    \"use_template\": false\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/bulk-create/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "bulk-create", ""]
+                }
+              }
+            },
+            {
+              "name": "Bulk Update INNs",
+              "request": {
+                "method": "PATCH",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"equipment_inns\": [\n        {\"id\": \"1\", \"inn\": \"NEW-INV-001\"},\n        {\"id\": \"2\", \"inn\": \"NEW-INV-002\"},\n        {\"id\": \"3\", \"inn\": \"NEW-INV-003\"}\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/bulk-inn-update/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "bulk-inn-update", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Movements",
+          "item": [
+            {
+              "name": "List Movements",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/movements/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "movements", ""]
+                }
+              }
+            },
+            {
+              "name": "List Movements (filter by equipment)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/movements/?equipment=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "movements", ""],
+                  "query": [{"key": "equipment", "value": "1"}]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Repairs",
+          "item": [
+            {
+              "name": "List Repairs",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/repairs/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "repairs", ""]
+                }
+              }
+            },
+            {
+              "name": "List Repairs (filter by status)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/repairs/?status=in_progress",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "repairs", ""],
+                  "query": [{"key": "status", "value": "in_progress"}]
+                }
+              }
+            },
+            {
+              "name": "Update Repair",
+              "request": {
+                "method": "PATCH",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"status\": \"completed\",\n    \"notes\": \"Заменён блок питания\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/repairs/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "repairs", "1", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disposals",
+          "item": [
+            {
+              "name": "List Disposals",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/disposals/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "disposals", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contracts",
+          "item": [
+            {
+              "name": "List Contracts",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/contracts/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "contracts", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Contract",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "multipart/form-data"}],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {"key": "number", "value": "CONTRACT-2024-001", "type": "text"},
+                    {"key": "signed_date", "value": "2024-01-15", "type": "text"},
+                    {"key": "file", "type": "file", "src": "/path/to/contract.pdf"}
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/contracts/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "contracts", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Templates",
+          "item": [
+            {
+              "name": "List Contract Templates",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/contract-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "contract-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Contract Template",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"CONTRACT-2024-\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/contract-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "contract-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "List INN Templates",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/inn-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "inn-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "Create INN Template",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"INV-2024-\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/inn-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "inn-templates", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📊 Statistics",
+      "description": "Статистика и дашборд (с кэшированием)",
+      "item": [
+        {
+          "name": "Full Statistics (cached 5 min)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/inventory/statistics/",
+              "host": ["{{base_url}}"],
+              "path": ["inventory", "statistics", ""]
+            }
+          }
+        },
+        {
+          "name": "Full Statistics (force refresh)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/inventory/statistics/?refresh=true",
+              "host": ["{{base_url}}"],
+              "path": ["inventory", "statistics", ""],
+              "query": [{"key": "refresh", "value": "true"}]
+            }
+          }
+        },
+        {
+          "name": "Dashboard (cached 2 min)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/inventory/dashboard/",
+              "host": ["{{base_url}}"],
+              "path": ["inventory", "dashboard", ""]
+            }
+          }
+        },
+        {
+          "name": "Dashboard (force refresh)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/inventory/dashboard/?refresh=true",
+              "host": ["{{base_url}}"],
+              "path": ["inventory", "dashboard", ""],
+              "query": [{"key": "refresh", "value": "true"}]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧪 Test Scenarios",
+      "description": "Полные сценарии для тестирования",
+      "item": [
+        {
+          "name": "Scenario 1: Equipment Lifecycle",
+          "description": "Полный жизненный цикл оборудования:\n1. Создание на складе\n2. Назначение в кабинет\n3. Начало использования\n4. Отправка на ремонт\n5. Завершение ремонта\n6. Возврат на склад\n7. Утилизация",
+          "item": [
+            {
+              "name": "1. Create Equipment (goes to warehouse)",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"name\": \"Тестовый компьютер\",\n    \"inn\": \"TEST-LIFECYCLE-001\",\n    \"specs\": {\"protsessor\": \"i5\", \"ozu_gb\": 8}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "2. Assign to Room",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"room\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/assign-to-room/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "assign-to-room", ""]
+                }
+              }
+            },
+            {
+              "name": "3. Start Use",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/start-use/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "start-use", ""]
+                }
+              }
+            },
+            {
+              "name": "4. Send to Repair",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/send-to-repair/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "send-to-repair", ""]
+                }
+              }
+            },
+            {
+              "name": "5. Complete Repair",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/complete-repair/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "complete-repair", ""]
+                }
+              }
+            },
+            {
+              "name": "6. Return to Warehouse",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/return-to-warehouse/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "return-to-warehouse", ""]
+                }
+              }
+            },
+            {
+              "name": "7. Dispose",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/dispose/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "dispose", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 2: Permission Tests",
+          "description": "Тестирование прав доступа для разных ролей",
+          "item": [
+            {
+              "name": "Login as Admin",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.collectionVariables.set('access_token', jsonData.access);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {"type": "noauth"},
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin123\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/token/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "token", ""]
+                }
+              }
+            },
+            {
+              "name": "Admin: Delete Equipment (should work)",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Login as Manager",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.collectionVariables.set('access_token', jsonData.access);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {"type": "noauth"},
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"username\": \"manager\",\n    \"password\": \"manager123\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/token/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "token", ""]
+                }
+              }
+            },
+            {
+              "name": "Manager: Create Equipment (should work)",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"name\": \"Manager Equipment\",\n    \"inn\": \"MGR-001\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "Manager: Delete Equipment (should FAIL)",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Login as User",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.collectionVariables.set('access_token', jsonData.access);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {"type": "noauth"},
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"username\": \"user\",\n    \"password\": \"user123\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/token/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "token", ""]
+                }
+              }
+            },
+            {
+              "name": "User: List Equipment (should work)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "User: Create Equipment (should FAIL)",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"name\": \"User Equipment\",\n    \"inn\": \"USR-001\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario 3: QR Scanning",
+          "description": "Тестирование сканирования QR-кодов кабинета и оборудования",
+          "item": [
+            {
+              "name": "1. Get Room UID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.results && jsonData.results.length > 0) {",
+                      "        pm.collectionVariables.set('room_uid', jsonData.results[0].uid);",
+                      "        console.log('Room UID saved: ' + jsonData.results[0].uid);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", ""]
+                }
+              }
+            },
+            {
+              "name": "2. Scan Room QR",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/scan/{{room_uid}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "scan", "{{room_uid}}", ""]
+                }
+              }
+            },
+            {
+              "name": "3. Download Room PDF",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/pdf/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", "pdf", ""]
+                }
+              }
+            },
+            {
+              "name": "4. Scan Equipment (by INN)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/scan/INV-2024-001/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "scan", "INV-2024-001", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
