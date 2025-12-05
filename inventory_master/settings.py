@@ -249,3 +249,128 @@ SIMPLE_JWT = {
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# ==================== LOGGING ====================
+# Оптимизировано для VPS с ограниченными ресурсами
+# - Логируем только WARNING и выше (не каждый запрос)
+# - Ротация файлов чтобы не забить диск
+# - Асинхронная запись через RotatingFileHandler
+
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {asctime} {message}',
+            'style': '{',
+        },
+    },
+
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+
+    'handlers': {
+        # Консоль — только в DEBUG режиме
+        'console': {
+            'level': 'INFO',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+
+        # Файл ошибок — WARNING и выше, ротация 5MB x 3 файла
+        'file_error': {
+            'level': 'WARNING',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIR / 'error.log',
+            'maxBytes': 5 * 1024 * 1024,  # 5 MB
+            'backupCount': 3,  # Храним 3 файла (15 MB макс)
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+
+        # Файл запросов — только INFO, ротация 10MB x 2 файла
+        # Отключен по умолчанию (раскомментируй если нужно)
+        # 'file_request': {
+        #     'level': 'INFO',
+        #     'class': 'logging.handlers.RotatingFileHandler',
+        #     'filename': LOG_DIR / 'request.log',
+        #     'maxBytes': 10 * 1024 * 1024,  # 10 MB
+        #     'backupCount': 2,
+        #     'formatter': 'simple',
+        #     'encoding': 'utf-8',
+        # },
+
+        # Файл безопасности — критичные события
+        'file_security': {
+            'level': 'WARNING',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIR / 'security.log',
+            'maxBytes': 5 * 1024 * 1024,  # 5 MB
+            'backupCount': 5,  # Храним дольше
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+    },
+
+    'loggers': {
+        # Django — только ошибки
+        'django': {
+            'handlers': ['console', 'file_error'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+
+        # Запросы — отключены (слишком много записей)
+        'django.request': {
+            'handlers': ['file_error'],
+            'level': 'ERROR',  # Только 4xx/5xx ошибки
+            'propagate': False,
+        },
+
+        # Безопасность — логируем отдельно
+        'django.security': {
+            'handlers': ['file_security'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+
+        # База данных — только ошибки (не логируем каждый запрос!)
+        'django.db.backends': {
+            'handlers': ['file_error'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+
+        # Приложения проекта — WARNING и выше
+        'inventory': {
+            'handlers': ['console', 'file_error'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'university': {
+            'handlers': ['console', 'file_error'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'user': {
+            'handlers': ['console', 'file_error'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}
