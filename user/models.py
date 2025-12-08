@@ -2,17 +2,55 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django_tenants.models import TenantMixin, DomainMixin
+
+
+class Tenant(TenantMixin):
+    """
+    Тенант — организация/компания.
+    Каждый тенант имеет свою PostgreSQL schema.
+    """
+    name = models.CharField(max_length=255, verbose_name="Название организации")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+
+    # Лимиты
+    max_users = models.PositiveIntegerField(default=100, verbose_name="Макс. пользователей")
+    max_equipment = models.PositiveIntegerField(default=10000, verbose_name="Макс. оборудования")
+
+    # django-tenants требует auto_create_schema
+    auto_create_schema = True
+
+    class Meta:
+        verbose_name = "Тенант"
+        verbose_name_plural = "Тенанты"
+
+    def __str__(self):
+        return self.name
+
+
+class Domain(DomainMixin):
+    """
+    Домены для тенантов.
+    Используем tenant_key вместо поддоменов.
+    """
+    pass
+
 
 class User(AbstractUser):
+    """
+    Пользователь — хранится в schema каждого тенанта.
+    """
     class Role(models.TextChoices):
-        ADMIN = 'admin', 'Администратор'
+        ADMIN = 'admin', 'Администратор'    # Глобальный доступ (только в public schema)
+        OWNER = 'owner', 'Владелец'         # Владелец тенанта
         MANAGER = 'manager', 'Менеджер'
-        USER = "user", "юзер"
+        USER = "user", "Пользователь"
 
     role = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=Role.choices,
-        default=Role.MANAGER,
+        default=Role.USER,
         verbose_name="Роль"
     )
     username = models.CharField(max_length=150, unique=True, verbose_name="Логин")
@@ -24,16 +62,28 @@ class User(AbstractUser):
     plain_password = models.CharField(max_length=128, blank=True, null=True, verbose_name="Исходный пароль")
 
     def is_admin(self):
+        """Глобальный админ — только в public schema"""
         return self.role == self.Role.ADMIN
+
+    def is_owner(self):
+        return self.role == self.Role.OWNER
 
     def is_manager(self):
         return self.role == self.Role.MANAGER
+
     def is_user(self):
         return self.role == self.Role.USER
+
+    def can_manage_users(self):
+        """Может ли создавать/редактировать пользователей"""
+        return self.role in [self.Role.ADMIN, self.Role.OWNER]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.get_role_display()})"
 
+    class Meta:
+        verbose_name = "Пользователь"
+        verbose_name_plural = "Пользователи"
 
 
 class SupportMessage(models.Model):
@@ -42,7 +92,7 @@ class SupportMessage(models.Model):
     message = models.TextField(verbose_name="Сообщение")
     sent_at = models.DateTimeField(auto_now_add=True, verbose_name="Время отправки")
     is_resolved = models.BooleanField(default=False, verbose_name="Решено")
-    is_notified = models.BooleanField(default=False) # Было ли сообщение уже показано админу
+    is_notified = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.subject} от {self.sender}"
@@ -51,7 +101,6 @@ class SupportMessage(models.Model):
         verbose_name = "Сообщение в поддержку"
         verbose_name_plural = "Сообщения в поддержку"
         ordering = ['-sent_at']
-
 
 
 class UserAction(models.Model):
@@ -87,20 +136,16 @@ class UserAction(models.Model):
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='actions')
-    action_type = models.CharField(max_length=30, choices=ACTION_TYPES) # Увеличена длина
+    action_type = models.CharField(max_length=30, choices=ACTION_TYPES)
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # Связь с конкретным объектом (если применимо)
     content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Тип объекта")
     object_id = models.PositiveIntegerField(null=True, blank=True, verbose_name="ID объекта")
     content_object = GenericForeignKey('content_type', 'object_id')
 
-    # Для отслеживания изменений
     old_value = models.TextField(null=True, blank=True, verbose_name="Старое значение")
     new_value = models.TextField(null=True, blank=True, verbose_name="Новое значение")
-
-    # Дополнительные детали действия
     details = models.JSONField(null=True, blank=True, verbose_name="Детали")
 
     class Meta:

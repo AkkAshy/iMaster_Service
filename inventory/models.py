@@ -7,6 +7,7 @@ from django_fsm import FSMField, transition
 
 
 class EquipmentType(models.Model):
+    """Тип оборудования — в schema тенанта"""
     name = models.CharField(max_length=100, verbose_name="Название типа оборудования")
     slug = models.SlugField(max_length=100, unique=True, blank=True, null=True, verbose_name="Слаг")
 
@@ -15,7 +16,6 @@ class EquipmentType(models.Model):
             from django.utils.text import slugify
             from transliterate import translit
             try:
-                # Транслитерация русского текста
                 transliterated = translit(self.name, 'ru', reversed=True)
                 self.slug = slugify(transliterated)
             except:
@@ -32,28 +32,28 @@ class EquipmentType(models.Model):
 
 class EquipmentSpecification(models.Model):
     """
-    Шаблон характеристик для типа оборудования.
-    Хранит JSON-схему полей, которые должны заполняться для Equipment.
+    Готовый набор характеристик для типа оборудования.
 
-    Пример template:
-    {
-        "cpu": {"label": "Процессор", "type": "string"},
-        "ram": {"label": "ОЗУ (ГБ)", "type": "integer"},
-        "has_wifi": {"label": "Wi-Fi", "type": "boolean"},
-        "drive_type": {"label": "Тип диска", "type": "choice", "choices": ["SSD", "HDD"]}
-    }
+    Пользователь при создании оборудования выбирает из списка готовых
+    спецификаций (например: "Dell OptiPlex i5/8GB", "Dell OptiPlex i7/16GB").
     """
-    type = models.OneToOneField(
+    type = models.ForeignKey(
         EquipmentType,
         on_delete=models.CASCADE,
-        related_name='specification',
+        related_name='specifications',
         verbose_name="Тип оборудования"
     )
-    template = models.JSONField(
+    name = models.CharField(
+        max_length=255,
+        verbose_name="Название спецификации",
+        help_text="Например: Dell OptiPlex i5/8GB/256SSD",
+        default="Стандартная спецификация"
+    )
+    specs = models.JSONField(
         default=dict,
         blank=True,
-        verbose_name="Шаблон характеристик",
-        help_text="JSON-схема полей: {field_key: {label, type, choices?, unit?}}"
+        verbose_name="Характеристики",
+        help_text="Готовые значения: {\"Процессор\": \"Intel i5\", \"ОЗУ\": 8}"
     )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -67,11 +67,11 @@ class EquipmentSpecification(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления")
 
     def __str__(self):
-        return f"Шаблон для {self.type.name}"
+        return f"{self.type.name} - {self.name}"
 
     class Meta:
-        verbose_name = "Шаблон характеристик"
-        verbose_name_plural = "Шаблоны характеристик"
+        verbose_name = "Спецификация оборудования"
+        verbose_name_plural = "Спецификации оборудования"
 
 
 class ContractDocument(models.Model):
@@ -132,7 +132,6 @@ class Equipment(models.Model):
     photo = models.CharField(max_length=500, blank=True, null=True, verbose_name="Фото оборудования")
     description = models.TextField(blank=True, verbose_name="Описание")
 
-    # FSM поле для статуса
     status = FSMField(default='in_stock', choices=STATUS_CHOICES, verbose_name="Состояние", protected=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -149,7 +148,6 @@ class Equipment(models.Model):
     uid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, verbose_name="Уникальный ID")
     qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True, verbose_name="QR-код")
 
-    # Динамические характеристики (заполняются по шаблону EquipmentSpecification)
     specs = models.JSONField(
         default=dict,
         blank=True,
@@ -157,7 +155,6 @@ class Equipment(models.Model):
         help_text="Значения характеристик по шаблону типа оборудования"
     )
 
-    # Временное хранение комнаты при ремонте (для возврата)
     _cached_room = None
 
     def __str__(self):
@@ -222,7 +219,6 @@ class Equipment(models.Model):
         from io import BytesIO
         from django.core.files import File
 
-        # QR содержит ИНН оборудования
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -241,23 +237,19 @@ class Equipment(models.Model):
         self.qr_code.save(filename, File(buffer), save=False)
 
     def save(self, *args, **kwargs):
-        # QR-код генерируется только если есть ИНН
         if self.inn:
-            # Новый объект или нет QR — генерируем
             if not self.pk or not self.qr_code:
                 self._generate_qr_code()
             else:
                 try:
                     original = Equipment.objects.get(pk=self.pk)
                     if original.inn != self.inn:
-                        # ИНН изменился — удаляем старый QR и генерируем новый
                         if self.qr_code:
                             self.qr_code.delete(save=False)
                         self._generate_qr_code()
                 except Equipment.DoesNotExist:
                     self._generate_qr_code()
         else:
-            # Нет ИНН — удаляем QR если был
             if self.qr_code:
                 self.qr_code.delete(save=False)
                 self.qr_code = None
@@ -303,9 +295,7 @@ class MovementHistory(models.Model):
 
 
 class Repair(models.Model):
-    """
-    Модель для записей о ремонте оборудования.
-    """
+    """Модель для записей о ремонте оборудования."""
     equipment = models.OneToOneField(Equipment, on_delete=models.CASCADE, related_name='repair_record')
     start_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата начала ремонта")
     end_date = models.DateTimeField(null=True, blank=True, verbose_name="Дата завершения")
@@ -321,8 +311,6 @@ class Repair(models.Model):
         verbose_name="Статус ремонта"
     )
     notes = models.TextField(blank=True, verbose_name="Примечания")
-
-    # Дополнительные поля для отслеживания исходного местоположения
     original_room = models.ForeignKey(
         'university.Room',
         on_delete=models.SET_NULL,
@@ -333,17 +321,9 @@ class Repair(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        """
-        Переопределенный метод save для записи ремонта.
-        ВАЖНО: Логика изменения статуса Equipment теперь в FSM (Equipment.send_to_repair, complete_repair, fail_repair)
-        Здесь только сохраняем original_room и обновляем end_date.
-        """
-        # Если запись новая, сохраняем исходный кабинет если не задан
         if not self.pk:
             if not self.original_room:
                 self.original_room = self.equipment.room
-
-        # Если запись существует и статус изменился на завершённый
         elif self.pk:
             try:
                 old_repair = Repair.objects.get(pk=self.pk)
@@ -363,15 +343,11 @@ class Repair(models.Model):
 
 
 class Disposal(models.Model):
-    """
-    Модель для записей об утилизации оборудования.
-    """
+    """Модель для записей об утилизации оборудования."""
     equipment = models.OneToOneField(Equipment, on_delete=models.CASCADE, related_name='disposal_record')
     disposal_date = models.DateTimeField(auto_now_add=True, verbose_name="Дата утилизации")
     reason = models.TextField(verbose_name="Причина утилизации")
     notes = models.TextField(blank=True, verbose_name="Примечания")
-
-    # Дополнительные поля для отслеживания исходного местоположения
     original_room = models.ForeignKey(
         'university.Room',
         on_delete=models.SET_NULL,
@@ -382,14 +358,9 @@ class Disposal(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        """
-        Переопределенный метод save для обработки логики утилизации.
-        """
-        # Если запись новая, сохраняем исходный кабинет и обновляем статус
         if not self.pk:
             self.original_room = self.equipment.room
 
-            # Удаляем оборудование из кабинета и меняем статус
             if self.equipment.status != 'disposed':
                 self.equipment.room = None
                 self.equipment.warehouse = None

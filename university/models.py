@@ -7,7 +7,7 @@ import uuid
 
 
 class University(models.Model):
-    """Университет"""
+    """Университет — в schema тенанта"""
     name = models.CharField(max_length=255, verbose_name="Название университета")
     address = models.TextField(verbose_name="Адрес")
     logo = models.ImageField(upload_to='university_logos/', null=True, blank=True, verbose_name="Логотип")
@@ -125,10 +125,7 @@ class Room(models.Model):
 
 
 class Warehouse(models.Model):
-    """
-    Склад — отдельная сущность для хранения оборудования.
-    Может быть несколько складов (главный, временный и т.д.)
-    """
+    """Склад — в schema тенанта"""
     name = models.CharField(max_length=255, verbose_name="Название склада")
     address = models.TextField(blank=True, verbose_name="Адрес")
     description = models.TextField(blank=True, verbose_name="Описание")
@@ -165,7 +162,7 @@ class Warehouse(models.Model):
         self.qr_code.save(f"warehouse_qr_{self.uid}.png", File(buffer), save=False)
 
     def save(self, *args, **kwargs):
-        # Только один главный склад
+        # Только один главный склад в schema
         if self.is_main:
             Warehouse.objects.filter(is_main=True).exclude(pk=self.pk).update(is_main=False)
 

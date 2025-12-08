@@ -1,0 +1,2028 @@
+{
+  "info": {
+    "name": "Inventory Master API - Multi-Tenant",
+    "description": "Полная коллекция API для системы управления инвентарём университета.\n\n## Мультитенантность\nСистема использует PostgreSQL schemas для изоляции данных тенантов.\n\n### Авторизация\n1. **Логин**: POST /api/auth/login/ (без X-Tenant-Key) — автоматически найдёт пользователя\n2. **В ответе получите**: `tenant_key` (schema_name тенанта)\n3. **Все последующие запросы**: добавляйте заголовок `X-Tenant-Key: {tenant_key}`\n\n### Роли\n- **admin**: Полный доступ (public schema, без X-Tenant-Key)\n- **owner**: Владелец тенанта, полный доступ к своему тенанту\n- **manager**: Чтение всего, создание, редактирование СВОИХ объектов. DELETE запрещён\n- **user**: Только чтение (GET)\n\n## Переменные коллекции\n- `base_url`: URL сервера\n- `access_token`: JWT токен\n- `refresh_token`: Refresh токен\n- `tenant_key`: Ключ тенанта (schema_name)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenant_key",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "room_uid",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "equipment_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "type_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "spec_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Авторизация и управление токенами.\n\nВажно: Логин не требует X-Tenant-Key — система сама найдёт пользователя.",
+      "item": [
+        {
+          "name": "Login (Smart - finds tenant automatically)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', jsonData.access);",
+                  "    pm.collectionVariables.set('refresh_token', jsonData.refresh);",
+                  "    if (jsonData.tenant_key) {",
+                  "        pm.collectionVariables.set('tenant_key', jsonData.tenant_key);",
+                  "        console.log('Tenant key saved: ' + jsonData.tenant_key);",
+                  "    } else {",
+                  "        pm.collectionVariables.set('tenant_key', '');",
+                  "        console.log('Public schema user (admin)');",
+                  "    }",
+                  "    console.log('Tokens saved!');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"owner\",\n    \"password\": \"owner123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login", ""]
+            }
+          }
+        },
+        {
+          "name": "Login as Admin (public schema)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', jsonData.access);",
+                  "    pm.collectionVariables.set('refresh_token', jsonData.refresh);",
+                  "    pm.collectionVariables.set('tenant_key', '');",
+                  "    console.log('Admin logged in (public schema)');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login", ""]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', jsonData.access);",
+                  "    console.log('Access token refreshed!');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/token/refresh/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "token", "refresh", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tenants (Admin only)",
+      "description": "Управление тенантами. Доступно только для admin в public schema.",
+      "item": [
+        {
+          "name": "List Tenants",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/user/tenants/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "tenants", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Tenant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Новый университет\",\n    \"schema_name\": \"newuniversity\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/tenants/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "tenants", ""]
+            }
+          }
+        },
+        {
+          "name": "Get Tenant",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/user/tenants/1/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "tenants", "1", ""]
+            }
+          }
+        },
+        {
+          "name": "Toggle Tenant Active",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/user/tenants/1/toggle-active/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "tenants", "1", "toggle-active", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "Управление пользователями. Требует X-Tenant-Key для работы в контексте тенанта.",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}",
+                "description": "Schema name тенанта"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/users/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", ""]
+            }
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"newuser\",\n    \"email\": \"newuser@example.com\",\n    \"first_name\": \"Иван\",\n    \"last_name\": \"Иванов\",\n    \"password\": \"password123\",\n    \"role\": \"user\",\n    \"phone_number\": \"+998901234567\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/users/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", ""]
+            }
+          }
+        },
+        {
+          "name": "Get Current User (me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/users/me/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "me", ""]
+            }
+          }
+        },
+        {
+          "name": "Update Current User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Обновлённое имя\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/users/update-me/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "update-me", ""]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/users/1/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "1", ""]
+            }
+          }
+        },
+        {
+          "name": "Toggle User Active",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/users/2/toggle-active/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "2", "toggle-active", ""]
+            }
+          }
+        },
+        {
+          "name": "Get User History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/users/1/history/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "1", "history", ""]
+            }
+          }
+        },
+        {
+          "name": "Get My History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/users/my-history/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "users", "my-history", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Support Messages",
+      "description": "Сообщения в техподдержку",
+      "item": [
+        {
+          "name": "Create Support Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"message\": \"Возникла проблема с оборудованием\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/user/support/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "support", ""]
+            }
+          }
+        },
+        {
+          "name": "List All Support Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/support/all/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "support", "all", ""]
+            }
+          }
+        },
+        {
+          "name": "Get New Support Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/support/new/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "support", "new", ""]
+            }
+          }
+        },
+        {
+          "name": "Mark Message as Notified",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Tenant-Key",
+                "value": "{{tenant_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/support/1/notify/",
+              "host": ["{{base_url}}"],
+              "path": ["user", "support", "1", "notify", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "University",
+      "description": "Структура университета",
+      "item": [
+        {
+          "name": "Universities",
+          "item": [
+            {
+              "name": "List Universities",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Tenant-Key",
+                    "value": "{{tenant_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/universities/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "universities", ""]
+                }
+              }
+            },
+            {
+              "name": "Create University",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"СамВМИ\",\n    \"address\": \"г. Самарканд, ул. Амира Темура, 18\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/universities/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "universities", ""]
+                }
+              }
+            },
+            {
+              "name": "Get University",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/universities/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "universities", "1", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buildings",
+          "item": [
+            {
+              "name": "List Buildings",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/buildings/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "buildings", ""]
+                }
+              }
+            },
+            {
+              "name": "List Buildings (filter by university)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/buildings/?university=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "buildings", ""],
+                  "query": [{"key": "university", "value": "1"}]
+                }
+              }
+            },
+            {
+              "name": "Create Building",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Главный корпус\",\n    \"address\": \"г. Самарканд, ул. Амира Темура, 18\",\n    \"university\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/buildings/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "buildings", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Floors",
+          "item": [
+            {
+              "name": "List Floors",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/floors/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "floors", ""]
+                }
+              }
+            },
+            {
+              "name": "List Floors (filter by building)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/floors/?building=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "floors", ""],
+                  "query": [{"key": "building", "value": "1"}]
+                }
+              }
+            },
+            {
+              "name": "Create Floor",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"number\": 1,\n    \"description\": \"Первый этаж\",\n    \"building\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/floors/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "floors", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Faculties",
+          "item": [
+            {
+              "name": "List Faculties",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Faculty",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Факультет информатики\",\n    \"building\": 1,\n    \"floor\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", ""]
+                }
+              }
+            },
+            {
+              "name": "Split Faculty",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"new_faculties\": [\n        {\"name\": \"Кафедра программирования\", \"floor_id\": 1},\n        {\"name\": \"Кафедра сетей\", \"floor_id\": 2}\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/1/split/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", "1", "split", ""]
+                }
+              }
+            },
+            {
+              "name": "Merge Faculties",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"faculty_ids\": [2, 3],\n    \"name\": \"Объединённый факультет\",\n    \"building_id\": 1,\n    \"floor_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/merge/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", "merge", ""]
+                }
+              }
+            },
+            {
+              "name": "Move Faculty",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"floor_id\": 2,\n    \"building_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/faculties/1/move/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "faculties", "1", "move", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rooms",
+          "item": [
+            {
+              "name": "List Rooms",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", ""]
+                }
+              }
+            },
+            {
+              "name": "List Rooms (with filters)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/?building=1&floor=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", ""],
+                  "query": [
+                    {"key": "building", "value": "1"},
+                    {"key": "floor", "value": "1"}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create Room",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"number\": \"101\",\n    \"name\": \"Серверная\",\n    \"building\": 1,\n    \"floor\": 1,\n    \"is_special\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Room",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Room Link",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/link/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", "link", ""]
+                }
+              }
+            },
+            {
+              "name": "Scan Room QR",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/scan/{{room_uid}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "scan", "{{room_uid}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Download Room PDF",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/pdf/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", "pdf", ""]
+                }
+              }
+            },
+            {
+              "name": "Split Room",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"new_rooms\": [\n        {\"number\": \"101A\"},\n        {\"number\": \"101B\"}\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/split/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", "split", ""]
+                }
+              }
+            },
+            {
+              "name": "Merge Rooms",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"room_ids\": [2, 3],\n    \"number\": \"101-102\",\n    \"floor_id\": 1,\n    \"building_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/merge/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "merge", ""]
+                }
+              }
+            },
+            {
+              "name": "Move Room",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"floor_id\": 2,\n    \"building_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/1/move/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "1", "move", ""]
+                }
+              }
+            },
+            {
+              "name": "My Room Actions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/rooms/my-actions/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "rooms", "my-actions", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Warehouses",
+          "item": [
+            {
+              "name": "List Warehouses",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/warehouses/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "warehouses", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Warehouse",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Главный склад\",\n    \"address\": \"г. Самарканд, ул. Амира Темура, 18\",\n    \"description\": \"Основной склад оборудования\",\n    \"is_main\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/university/warehouses/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "warehouses", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Main Warehouse",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/university/warehouses/main/",
+                  "host": ["{{base_url}}"],
+                  "path": ["university", "warehouses", "main", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "description": "Управление оборудованием",
+      "item": [
+        {
+          "name": "Equipment Types",
+          "item": [
+            {
+              "name": "List Types",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/types/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "types", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Type",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Компьютер\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/types/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "types", ""]
+                }
+              }
+            },
+            {
+              "name": "Search Types",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/types/?search=комп",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "types", ""],
+                  "query": [{"key": "search", "value": "комп"}]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Specifications (Готовые наборы характеристик)",
+          "description": "Спецификация — готовый набор характеристик для типа оборудования.\nПользователь при создании оборудования ВЫБИРАЕТ спецификацию из списка, а не заполняет характеристики вручную.",
+          "item": [
+            {
+              "name": "List All Specifications",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Specifications by Type (для выбора при создании оборудования)",
+              "description": "Используйте этот endpoint для получения списка доступных спецификаций при создании оборудования.\nПользователь выбирает одну из них, и её ID передаётся в поле 'specification'.",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/by-type/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", "by-type", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Specification Keys by Type (для создания новой спецификации)",
+              "description": "Возвращает уникальные ключи характеристик из всех спецификаций данного типа.\nИспользуйте при создании новой спецификации — чтобы выбрать ключи из существующих, а не вводить заново.",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/keys/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", "keys", "1", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Specification (Базовая конфигурация)",
+              "description": "Создание спецификации с готовыми значениями характеристик.\nПри создании оборудования эти значения будут скопированы в поле specs.",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"name\": \"Dell OptiPlex i5/8GB/256SSD\",\n    \"specs\": {\n        \"Процессор\": \"Intel Core i5-12400\",\n        \"ОЗУ\": \"8 ГБ DDR4\",\n        \"Накопитель\": \"256 ГБ SSD\",\n        \"Видеокарта\": \"Intel UHD 730\"\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Specification (Продвинутая конфигурация)",
+              "description": "Создание второй спецификации для того же типа — пользователь сможет выбрать из нескольких вариантов.",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"name\": \"Dell OptiPlex i7/16GB/512SSD\",\n    \"specs\": {\n        \"Процессор\": \"Intel Core i7-12700\",\n        \"ОЗУ\": \"16 ГБ DDR4\",\n        \"Накопитель\": \"512 ГБ SSD\",\n        \"Видеокарта\": \"Intel UHD 770\"\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Equipment",
+          "item": [
+            {
+              "name": "List Equipment",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "List Equipment (with expand)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/?expand=type,room,warehouse,author",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""],
+                  "query": [{"key": "expand", "value": "type,room,warehouse,author"}]
+                }
+              }
+            },
+            {
+              "name": "List Equipment (with filters)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/?status=in_use&type=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""],
+                  "query": [
+                    {"key": "status", "value": "in_use"},
+                    {"key": "type", "value": "1"}
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create Equipment (с выбором спецификации)",
+              "description": "Создание оборудования с выбором готовой спецификации.\nПоле 'specification' — ID спецификации из списка by-type.\nПоле 'specs' заполнится автоматически из выбранной спецификации!",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.collectionVariables.set('equipment_id', jsonData.id);",
+                      "    console.log('Equipment ID saved: ' + jsonData.id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"specification\": 1,\n    \"name\": \"Компьютер Dell OptiPlex\",\n    \"inn\": \"INV-2024-001\",\n    \"description\": \"Офисный компьютер\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Equipment",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/?expand=type,room,author",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", ""],
+                  "query": [{"key": "expand", "value": "type,room,author"}]
+                }
+              }
+            },
+            {
+              "name": "Update Equipment",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Обновлённое название\",\n    \"description\": \"Новое описание\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Scan Equipment (by INN)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/scan/INV-2024-001/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "scan", "INV-2024-001", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "FSM Actions",
+          "description": "Изменение статуса оборудования",
+          "item": [
+            {
+              "name": "Assign to Room",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"room\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/assign-to-room/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "assign-to-room", ""]
+                }
+              }
+            },
+            {
+              "name": "Start Use",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/start-use/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "start-use", ""]
+                }
+              }
+            },
+            {
+              "name": "Send to Repair",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/send-to-repair/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "send-to-repair", ""]
+                }
+              }
+            },
+            {
+              "name": "Complete Repair",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/complete-repair/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "complete-repair", ""]
+                }
+              }
+            },
+            {
+              "name": "Return to Warehouse",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/return-to-warehouse/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "return-to-warehouse", ""]
+                }
+              }
+            },
+            {
+              "name": "Dispose",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/dispose/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "dispose", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk Operations",
+          "item": [
+            {
+              "name": "Bulk Create Equipment (с выбором спецификации)",
+              "description": "Массовое создание оборудования с выбором готовой спецификации.\nПоле 'specification' — ID спецификации.\nSpecs будут скопированы для ВСЕХ созданных единиц оборудования.",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"specification\": 1,\n    \"name\": \"Компьютер Dell\",\n    \"count\": 5,\n    \"inns\": [\"INV-001\", \"INV-002\", \"INV-003\", \"INV-004\", \"INV-005\"]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/bulk-create/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "bulk-create", ""]
+                }
+              }
+            },
+            {
+              "name": "Bulk Update INNs",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"equipment_inns\": [\n        {\"id\": \"1\", \"inn\": \"NEW-INV-001\"},\n        {\"id\": \"2\", \"inn\": \"NEW-INV-002\"}\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/bulk-inn-update/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "bulk-inn-update", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Movements",
+          "item": [
+            {
+              "name": "List Movements",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/movements/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "movements", ""]
+                }
+              }
+            },
+            {
+              "name": "List Movements (by equipment)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/movements/?equipment=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "movements", ""],
+                  "query": [{"key": "equipment", "value": "1"}]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Repairs",
+          "item": [
+            {
+              "name": "List Repairs",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/repairs/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "repairs", ""]
+                }
+              }
+            },
+            {
+              "name": "Update Repair",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"status\": \"completed\",\n    \"notes\": \"Заменён блок питания\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/repairs/1/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "repairs", "1", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disposals",
+          "item": [
+            {
+              "name": "List Disposals",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/disposals/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "disposals", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contracts",
+          "item": [
+            {
+              "name": "List Contracts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/contracts/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "contracts", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Contract (multipart)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {"key": "number", "value": "CONTRACT-2024-001", "type": "text"},
+                    {"key": "signed_date", "value": "2024-01-15", "type": "text"},
+                    {"key": "file", "type": "file", "src": "/path/to/contract.pdf"}
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/contracts/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "contracts", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Templates",
+          "item": [
+            {
+              "name": "List Contract Templates",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/contract-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "contract-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "List INN Templates",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/inn-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "inn-templates", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Statistics",
+      "description": "Статистика и дашборд (с кэшированием)",
+      "item": [
+        {
+          "name": "Full Statistics (cached 5 min)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/inventory/statistics/",
+              "host": ["{{base_url}}"],
+              "path": ["inventory", "statistics", ""]
+            }
+          }
+        },
+        {
+          "name": "Full Statistics (force refresh)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/inventory/statistics/?refresh=true",
+              "host": ["{{base_url}}"],
+              "path": ["inventory", "statistics", ""],
+              "query": [{"key": "refresh", "value": "true"}]
+            }
+          }
+        },
+        {
+          "name": "Dashboard (cached 2 min)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/inventory/dashboard/",
+              "host": ["{{base_url}}"],
+              "path": ["inventory", "dashboard", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test Scenarios",
+      "description": "Полные сценарии для тестирования",
+      "item": [
+        {
+          "name": "Scenario: Login Flow",
+          "description": "Полный флоу логина для разных ролей",
+          "item": [
+            {
+              "name": "1. Login as Owner (gets tenant_key)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Login successful', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.collectionVariables.set('access_token', jsonData.access);",
+                      "    pm.collectionVariables.set('refresh_token', jsonData.refresh);",
+                      "    pm.collectionVariables.set('tenant_key', jsonData.tenant_key);",
+                      "    ",
+                      "    pm.test('Has tenant_key', function () {",
+                      "        pm.expect(jsonData.tenant_key).to.not.be.null;",
+                      "    });",
+                      "    ",
+                      "    pm.test('Has user info', function () {",
+                      "        pm.expect(jsonData.user).to.have.property('username');",
+                      "        pm.expect(jsonData.user).to.have.property('role');",
+                      "    });",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {"type": "noauth"},
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"username\": \"owner\",\n    \"password\": \"owner123\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/login/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "login", ""]
+                }
+              }
+            },
+            {
+              "name": "2. Access tenant data with X-Tenant-Key",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Can access tenant data', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "3. Login as Admin (no tenant_key)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Login successful', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.collectionVariables.set('access_token', jsonData.access);",
+                      "    ",
+                      "    pm.test('tenant_key is null (admin in public)', function () {",
+                      "        pm.expect(jsonData.tenant_key).to.be.null;",
+                      "    });",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {"type": "noauth"},
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin123\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/login/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "login", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario: Equipment Lifecycle",
+          "description": "Полный жизненный цикл оборудования",
+          "item": [
+            {
+              "name": "1. Create Equipment",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.collectionVariables.set('equipment_id', jsonData.id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": 1,\n    \"name\": \"Тестовый компьютер\",\n    \"inn\": \"TEST-LIFECYCLE-001\",\n    \"specs\": {\"protsessor\": \"i5\", \"ozu_gb\": 8}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "2. Assign to Room",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"room\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/assign-to-room/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "assign-to-room", ""]
+                }
+              }
+            },
+            {
+              "name": "3. Start Use",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/start-use/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "start-use", ""]
+                }
+              }
+            },
+            {
+              "name": "4. Send to Repair",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/send-to-repair/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "send-to-repair", ""]
+                }
+              }
+            },
+            {
+              "name": "5. Complete Repair",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/complete-repair/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "complete-repair", ""]
+                }
+              }
+            },
+            {
+              "name": "6. Return to Warehouse",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/return-to-warehouse/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "return-to-warehouse", ""]
+                }
+              }
+            },
+            {
+              "name": "7. Dispose",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/{{equipment_id}}/dispose/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "{{equipment_id}}", "dispose", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Scenario: Type → Specification → Equipment",
+          "description": "Полный workflow создания оборудования:\n1. Создать тип\n2. Создать спецификации для типа\n3. Получить список спецификаций\n4. Создать оборудование с выбранной спецификацией",
+          "item": [
+            {
+              "name": "1. Create Equipment Type",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.collectionVariables.set('type_id', jsonData.id);",
+                      "    console.log('Type ID saved: ' + jsonData.id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Принтер\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/types/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "types", ""]
+                }
+              }
+            },
+            {
+              "name": "2. Create Specification (Basic)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.collectionVariables.set('spec_id', jsonData.id);",
+                      "    console.log('Spec ID saved: ' + jsonData.id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": {{type_id}},\n    \"name\": \"HP LaserJet Pro (ч/б)\",\n    \"specs\": {\n        \"Тип печати\": \"Лазерная ч/б\",\n        \"Скорость\": \"30 стр/мин\",\n        \"Формат\": \"A4\",\n        \"Wi-Fi\": false\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", ""]
+                }
+              }
+            },
+            {
+              "name": "3. Create Specification (Advanced)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": {{type_id}},\n    \"name\": \"HP LaserJet Pro Color\",\n    \"specs\": {\n        \"Тип печати\": \"Лазерная цветная\",\n        \"Скорость\": \"25 стр/мин\",\n        \"Формат\": \"A4\",\n        \"Wi-Fi\": true,\n        \"Дуплекс\": true\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", ""]
+                }
+              }
+            },
+            {
+              "name": "4. Get Specifications for Type (пользователь выбирает)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "url": {
+                  "raw": "{{base_url}}/inventory/specifications/by-type/{{type_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "specifications", "by-type", "{{type_id}}", ""]
+                }
+              }
+            },
+            {
+              "name": "5. Create Equipment (выбрана спецификация)",
+              "description": "Пользователь выбрал спецификацию {{spec_id}} из списка.\nSpecs скопируются автоматически!",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": {{type_id}},\n    \"specification\": {{spec_id}},\n    \"name\": \"Принтер HP\",\n    \"inn\": \"PRINTER-001\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", ""]
+                }
+              }
+            },
+            {
+              "name": "6. Bulk Create Equipment (с той же спецификацией)",
+              "description": "Массовое создание с той же спецификацией — specs скопируются для всех 3 единиц.",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {"key": "Content-Type", "value": "application/json"},
+                  {"key": "X-Tenant-Key", "value": "{{tenant_key}}"}
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"type\": {{type_id}},\n    \"specification\": {{spec_id}},\n    \"name\": \"Принтер HP\",\n    \"count\": 3,\n    \"inns\": [\"PRINTER-002\", \"PRINTER-003\", \"PRINTER-004\"]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/inventory/equipment/bulk-create/",
+                  "host": ["{{base_url}}"],
+                  "path": ["inventory", "equipment", "bulk-create", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

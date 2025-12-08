@@ -2,16 +2,19 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import UserViewSet, SupportMessageCreateAPIView, SupportMessageListAPIView, NewSupportMessagesAPIView, MarkSupportMessageAsNotifiedAPIView
+from .views import (
+    UserViewSet, TenantViewSet,
+    SupportMessageCreateAPIView, SupportMessageListAPIView,
+    NewSupportMessagesAPIView, MarkSupportMessageAsNotifiedAPIView
+)
 
 router = DefaultRouter()
-router.register(r'users', UserViewSet, basename='user')  # Изменено с 'user' на 'users'
+router.register(r'users', UserViewSet, basename='user')
+router.register(r'tenants', TenantViewSet, basename='tenant')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # Логин теперь в /api/auth/login/
     path('support/', SupportMessageCreateAPIView.as_view(), name='support-create'),
     path('support/all/', SupportMessageListAPIView.as_view(), name='support-list'),
     path('support/new/', NewSupportMessagesAPIView.as_view(), name='support-new'),

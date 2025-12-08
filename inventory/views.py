@@ -43,15 +43,19 @@ class EquipmentTypeViewSet(viewsets.ModelViewSet):
 
 class EquipmentSpecificationViewSet(viewsets.ModelViewSet):
     """
-    CRUD для шаблонов характеристик.
+    CRUD для спецификаций оборудования.
 
-    POST /api/specifications/
+    Спецификация — готовый набор характеристик для типа оборудования.
+    Пользователь выбирает спецификацию при создании оборудования.
+
+    POST /inventory/specifications/
     {
         "type": 1,
-        "template": {
-            "cpu": {"label": "Процессор", "type": "string", "required": true},
-            "ram": {"label": "ОЗУ", "type": "integer"},
-            "has_wifi": {"label": "Wi-Fi", "type": "boolean"}
+        "name": "Dell OptiPlex i5/8GB/256SSD",
+        "specs": {
+            "Процессор": "Intel Core i5-12400",
+            "ОЗУ": "8 ГБ DDR4",
+            "Накопитель": "256 ГБ SSD"
         }
     }
     """
@@ -59,100 +63,72 @@ class EquipmentSpecificationViewSet(viewsets.ModelViewSet):
     serializer_class = EquipmentSpecificationSerializer
     permission_classes = [IsAuthenticated, RoleBasedPermission]
     filter_backends = [SearchFilter, DjangoFilterBackend]
-    search_fields = ['type__name']
+    search_fields = ['name', 'type__name']
     filterset_fields = ['type']
 
     @action(detail=False, methods=['get'], url_path='by-type/(?P<type_id>[^/.]+)')
     def by_type(self, request, type_id=None):
-        """Получить шаблон по типу оборудования"""
-        try:
-            spec = EquipmentSpecification.objects.get(type_id=type_id)
-            serializer = self.get_serializer(spec)
-            return Response(serializer.data)
-        except EquipmentSpecification.DoesNotExist:
-            return Response(
-                {"detail": "Шаблон для этого типа не найден"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        """Получить все спецификации для типа оборудования"""
+        specs = EquipmentSpecification.objects.filter(type_id=type_id)
+        serializer = self.get_serializer(specs, many=True)
+        return Response(serializer.data)
 
-    @action(detail=False, methods=['get'], url_path='form/(?P<type_id>[^/.]+)')
-    def get_form(self, request, type_id=None):
+    @action(detail=False, methods=['get'], url_path='keys/(?P<type_id>[^/.]+)')
+    def keys(self, request, type_id=None):
         """
-        GET /inventory/specifications/form/{type_id}/
+        Получить уникальные ключи характеристик для типа оборудования.
 
-        Получить готовую форму для заполнения характеристик.
-        Возвращает ключи из шаблона с пустыми значениями для заполнения.
+        GET /inventory/specifications/keys/{type_id}/
+
+        Возвращает список уникальных ключей из всех спецификаций данного типа.
+        Используется при создании новой спецификации — чтобы выбрать ключи
+        из существующих, а не писать заново.
+
+        Формат ключей: {key: транслит, display: оригинал}
 
         Ответ:
         {
             "type_id": 1,
             "type_name": "Компьютер",
-            "fields": [
-                {
-                    "key": "cpu",
-                    "label": "Процессор",
-                    "type": "string",
-                    "required": true,
-                    "default": null,
-                    "choices": null
-                },
-                {
-                    "key": "ram",
-                    "label": "ОЗУ (ГБ)",
-                    "type": "integer",
-                    "required": false,
-                    "default": 8,
-                    "choices": null
-                }
-            ],
-            "empty_specs": {
-                "cpu": "",
-                "ram": 8
-            }
+            "keys": [
+                {"key": "nakopitel", "display": "Накопитель"},
+                {"key": "ozu", "display": "ОЗУ"},
+                {"key": "protsessor", "display": "Процессор"}
+            ]
         }
         """
-        try:
-            spec = EquipmentSpecification.objects.select_related('type').get(type_id=type_id)
-        except EquipmentSpecification.DoesNotExist:
+        from .models import EquipmentType
+
+        # Получаем тип
+        equipment_type = EquipmentType.objects.filter(id=type_id).first()
+        if not equipment_type:
             return Response(
-                {"detail": "Шаблон для этого типа не найден"},
+                {"detail": f"Тип оборудования с id={type_id} не найден"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        template = spec.template or {}
-        fields = []
-        empty_specs = {}
+        # Собираем все уникальные ключи из спецификаций этого типа
+        specs = EquipmentSpecification.objects.filter(type_id=type_id)
+        keys_dict = {}  # {key: display} для дедупликации
+        for spec in specs:
+            if spec.specs and isinstance(spec.specs, dict):
+                for key, value in spec.specs.items():
+                    if key not in keys_dict:
+                        # Извлекаем display из нового формата
+                        if isinstance(value, dict) and 'display' in value:
+                            keys_dict[key] = value['display']
+                        else:
+                            # Старый формат — ключ сам является display
+                            keys_dict[key] = key
 
-        for key, field_def in template.items():
-            field_info = {
-                'key': key,
-                'label': field_def.get('label', key),
-                'type': field_def.get('type', 'string'),
-                'required': field_def.get('required', False),
-                'default': field_def.get('default'),
-                'choices': field_def.get('choices'),
-            }
-            fields.append(field_info)
-
-            # Формируем пустой specs с дефолтами
-            if 'default' in field_def:
-                empty_specs[key] = field_def['default']
-            else:
-                # Пустое значение по типу
-                type_defaults = {
-                    'string': '',
-                    'integer': None,
-                    'float': None,
-                    'boolean': False,
-                    'choice': None,
-                }
-                empty_specs[key] = type_defaults.get(field_def.get('type', 'string'), '')
+        # Преобразуем в список объектов и сортируем по display
+        keys_list = [{"key": k, "display": v} for k, v in keys_dict.items()]
+        keys_list.sort(key=lambda x: x['display'])
 
         return Response({
-            'type_id': spec.type.id,
-            'type_name': spec.type.name,
-            'fields': fields,
-            'empty_specs': empty_specs,
+            "type_id": int(type_id),
+            "type_name": equipment_type.name,
+            "keys": keys_list
         })
 
 

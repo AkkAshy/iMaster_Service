@@ -97,89 +97,89 @@ def transliterate_key(text):
     return key or 'field'
 
 
-# ==================== EQUIPMENT SPECIFICATION (ШАБЛОН ХАРАКТЕРИСТИК) ====================
+# ==================== EQUIPMENT SPECIFICATION (ГОТОВЫЕ ХАРАКТЕРИСТИКИ) ====================
 
 class EquipmentSpecificationSerializer(serializers.ModelSerializer):
     """
-    Сериализатор для шаблона характеристик типа оборудования.
+    Сериализатор для спецификации оборудования.
 
-    Пользователь может писать ключи на русском — они автоматически транслитерируются.
+    Спецификация — это готовый набор характеристик для типа оборудования.
+    Пользователь выбирает спецификацию из списка при создании оборудования.
 
-    Пример входящего template:
+    Формат specs:
     {
-        "Процессор": {"type": "string"},
-        "ОЗУ (ГБ)": {"type": "integer"},
-        "Wi-Fi": {"type": "boolean"}
+        "protsessor": {"display": "Процессор", "value": "Intel Core i5-12400"},
+        "ozu": {"display": "ОЗУ", "value": "8 ГБ DDR4"},
+        "nakopitel": {"display": "Накопитель", "value": "256 ГБ SSD"}
     }
 
-    Результат после транслитерации:
+    Пример создания (упрощённый формат — ключи транслитерируются автоматически):
     {
-        "protsessor": {"label": "Процессор", "type": "string"},
-        "ozu_gb": {"label": "ОЗУ (ГБ)", "type": "integer"},
-        "wifi": {"label": "Wi-Fi", "type": "boolean"}
+        "type": 1,
+        "name": "Dell OptiPlex i5/8GB/256SSD",
+        "specs": {
+            "Процессор": "Intel Core i5-12400",
+            "ОЗУ": "8 ГБ DDR4",
+            "Накопитель": "256 ГБ SSD"
+        }
     }
     """
     type_name = serializers.CharField(source='type.name', read_only=True)
 
     class Meta:
         model = EquipmentSpecification
-        fields = ['id', 'type', 'type_name', 'template', 'author', 'created_at', 'updated_at']
+        fields = ['id', 'type', 'type_name', 'name', 'specs', 'author', 'created_at', 'updated_at']
         read_only_fields = ['author', 'created_at', 'updated_at']
 
-    def validate_template(self, template):
-        """Валидация и транслитерация ключей шаблона"""
-        if not isinstance(template, dict):
-            raise serializers.ValidationError("Шаблон должен быть объектом JSON")
+    def validate_specs(self, specs):
+        """Валидация и трансформация specs"""
+        if not isinstance(specs, dict):
+            raise serializers.ValidationError("Характеристики должны быть объектом JSON")
+        return specs
 
-        allowed_types = ['string', 'integer', 'float', 'boolean', 'choice']
-        new_template = {}
+    def _transform_specs(self, specs):
+        """
+        Преобразует specs в формат {key: {display, value}}.
 
-        for field_key, field_data in template.items():
-            if not isinstance(field_data, dict):
-                raise serializers.ValidationError(
-                    f"Поле '{field_key}' должно быть объектом"
-                )
+        Входной формат (упрощённый):
+            {"Процессор": "Intel i5", "ОЗУ": "8GB"}
 
-            if 'type' not in field_data:
-                raise serializers.ValidationError(
-                    f"В поле '{field_key}' отсутствует 'type'"
-                )
-
-            field_type = field_data['type']
-            if field_type not in allowed_types:
-                raise serializers.ValidationError(
-                    f"Недопустимый тип '{field_type}' для поля '{field_key}'. "
-                    f"Допустимые: {', '.join(allowed_types)}"
-                )
-
-            if field_type == 'choice':
-                if 'choices' not in field_data or not isinstance(field_data['choices'], list):
-                    raise serializers.ValidationError(
-                        f"Поле '{field_key}' типа 'choice' должно иметь список 'choices'"
-                    )
-
-            # Транслитерируем ключ
-            new_key = transliterate_key(field_key)
-
-            # Проверяем на дубликаты после транслитерации
-            if new_key in new_template:
-                raise serializers.ValidationError(
-                    f"После транслитерации ключи '{field_key}' и другой ключ совпали: '{new_key}'"
-                )
-
-            # Если label не указан, используем оригинальный ключ как label
-            if 'label' not in field_data:
-                field_data['label'] = field_key
-
-            new_template[new_key] = field_data
-
-        return new_template
+        Выходной формат:
+            {"protsessor": {"display": "Процессор", "value": "Intel i5"},
+             "ozu": {"display": "ОЗУ", "value": "8GB"}}
+        """
+        transformed = {}
+        for display_key, value in specs.items():
+            # Если уже в новом формате — оставляем как есть
+            if isinstance(value, dict) and 'display' in value and 'value' in value:
+                key = transliterate_key(display_key)
+                transformed[key] = value
+            else:
+                # Преобразуем из упрощённого формата
+                key = transliterate_key(display_key)
+                transformed[key] = {
+                    "display": display_key,
+                    "value": value
+                }
+        return transformed
 
     def create(self, validated_data):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             validated_data['author'] = request.user
+
+        # Трансформируем specs
+        if 'specs' in validated_data:
+            validated_data['specs'] = self._transform_specs(validated_data['specs'])
+
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Трансформируем specs при обновлении
+        if 'specs' in validated_data:
+            validated_data['specs'] = self._transform_specs(validated_data['specs'])
+
+        return super().update(instance, validated_data)
 
 
 # ==================== EQUIPMENT (ЕДИНИЧНОЕ СОЗДАНИЕ С FSM) ====================
@@ -187,28 +187,44 @@ class EquipmentSpecificationSerializer(serializers.ModelSerializer):
 class EquipmentSerializer(serializers.ModelSerializer):
     """
     Сериализатор оборудования с поддержкой:
-    - Динамических характеристик (specs)
+    - Выбор спецификации (specification) — готовый набор характеристик
     - FSM переходов статуса
     - Размещения на складе или в кабинете
     - expand параметра для вложенных данных
 
+    Создание оборудования:
+        POST /inventory/equipment/
+        {
+            "type": 1,
+            "specification": 5,  // ID спецификации — specs заполнятся автоматически
+            "name": "Компьютер Dell",
+            "inn": "INV-001"
+        }
+
     Использование expand:
-        GET /inventory/equipment/?expand=type,room
+        GET /inventory/equipment/?expand=type,room,specification
         GET /inventory/equipment/1/?expand=type,room,warehouse,author
 
-    Доступные поля для expand: type, room, warehouse, author, contract, repair, disposal
+    Доступные поля для expand: type, room, warehouse, author, contract, repair, disposal, specification
     """
     qr_code_url = serializers.SerializerMethodField()
     send_to_warehouse = serializers.BooleanField(write_only=True, required=False, default=False)
+    specification = serializers.PrimaryKeyRelatedField(
+        queryset=EquipmentSpecification.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+        help_text="ID спецификации — specs заполнятся автоматически"
+    )
 
     class Meta:
         model = Equipment
         fields = [
-            'id', 'type', 'room', 'warehouse', 'name', 'photo', 'description',
+            'id', 'type', 'specification', 'room', 'warehouse', 'name', 'photo', 'description',
             'status', 'is_active', 'inn', 'contract', 'uid', 'qr_code', 'qr_code_url',
             'specs', 'author', 'created_at', 'location', 'send_to_warehouse'
         ]
-        read_only_fields = ['uid', 'qr_code', 'created_at', 'author']
+        read_only_fields = ['uid', 'qr_code', 'created_at', 'author', 'specs']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -261,14 +277,16 @@ class EquipmentSerializer(serializers.ModelSerializer):
     def validate(self, data):
         instance = getattr(self, 'instance', None)
         equipment_type = data.get('type') or (instance.type if instance else None)
+        specification = data.get('specification')
 
         if not equipment_type:
             raise serializers.ValidationError({"type": "Поле type обязательно"})
 
-        # Валидация specs по шаблону
-        specs = data.get('specs', {})
-        if specs:
-            self._validate_specs(equipment_type, specs)
+        # Проверяем что спецификация принадлежит этому типу
+        if specification and specification.type != equipment_type:
+            raise serializers.ValidationError({
+                "specification": f"Спецификация '{specification.name}' не принадлежит типу '{equipment_type.name}'"
+            })
 
         # Проверка: нельзя указывать и room, и warehouse одновременно
         room = data.get('room')
@@ -291,44 +309,6 @@ class EquipmentSerializer(serializers.ModelSerializer):
             self._validate_fsm_transition(instance, new_status)
 
         return data
-
-    def _validate_specs(self, equipment_type, specs):
-        """Валидация specs по шаблону EquipmentSpecification"""
-        try:
-            template = equipment_type.specification.template
-        except EquipmentSpecification.DoesNotExist:
-            return  # Если шаблона нет, пропускаем
-
-        if not template:
-            return
-
-        for key, field_def in template.items():
-            field_type = field_def.get('type')
-            is_required = field_def.get('required', False)
-
-            if key not in specs:
-                if is_required:
-                    raise serializers.ValidationError(
-                        {"specs": f"Отсутствует обязательное поле '{field_def.get('label', key)}'"}
-                    )
-                continue
-
-            value = specs[key]
-
-            if field_type == 'integer' and not isinstance(value, int):
-                raise serializers.ValidationError({"specs": f"'{key}' должно быть целым числом"})
-            elif field_type == 'float' and not isinstance(value, (int, float)):
-                raise serializers.ValidationError({"specs": f"'{key}' должно быть числом"})
-            elif field_type == 'boolean' and not isinstance(value, bool):
-                raise serializers.ValidationError({"specs": f"'{key}' должно быть true/false"})
-            elif field_type == 'string' and not isinstance(value, str):
-                raise serializers.ValidationError({"specs": f"'{key}' должно быть строкой"})
-            elif field_type == 'choice':
-                choices = field_def.get('choices', [])
-                if value not in choices:
-                    raise serializers.ValidationError(
-                        {"specs": f"'{key}' должно быть одним из: {', '.join(map(str, choices))}"}
-                    )
 
     def _validate_fsm_transition(self, instance, new_status):
         """Проверка допустимости FSM перехода"""
@@ -353,6 +333,13 @@ class EquipmentSerializer(serializers.ModelSerializer):
         # Убираем поля которые нельзя указать при создании
         validated_data.pop('send_to_warehouse', False)
         validated_data.pop('room', None)  # Игнорируем room — всегда сначала на склад
+
+        # Получаем спецификацию и заполняем specs
+        specification = validated_data.pop('specification', None)
+        if specification:
+            validated_data['specs'] = specification.specs
+        else:
+            validated_data['specs'] = {}
 
         # Новое оборудование ВСЕГДА попадает на главный склад
         main_warehouse = Warehouse.get_main()
@@ -482,36 +469,43 @@ class BulkEquipmentSerializer(serializers.Serializer):
     Сериализатор для массового создания оборудования.
 
     Оборудование ВСЕГДА создаётся на главном складе.
-
-    Можно:
-    1. Использовать шаблон specs из EquipmentSpecification (use_template=true)
-    2. Передать свои specs
-    3. Оставить specs пустым
+    Пользователь выбирает спецификацию (specification) — характеристики заполняются автоматически.
 
     Пример запроса:
     {
         "type": 1,
+        "specification": 5,  // ID спецификации
         "name": "Компьютер",
         "count": 10,
-        "use_template": true,  // использовать шаблон из EquipmentSpecification
-        "specs": {"cpu": "i7", "ram": 16},  // дополнительные или свои значения
         "inns": ["001", "002", "003", ...]  // опционально
     }
     """
     type = serializers.PrimaryKeyRelatedField(queryset=EquipmentType.objects.all())
+    specification = serializers.PrimaryKeyRelatedField(
+        queryset=EquipmentSpecification.objects.all(),
+        required=False,
+        allow_null=True,
+        help_text="ID спецификации — specs заполнятся автоматически"
+    )
     name = serializers.CharField(max_length=255)
     count = serializers.IntegerField(min_value=1, max_value=100)
-    use_template = serializers.BooleanField(required=False, default=True)
-    specs = serializers.JSONField(required=False, default=dict)
     inns = serializers.ListField(
         child=serializers.CharField(max_length=100),
         required=False,
         allow_null=True
     )
 
-    def validate(self, data):
-        inns = data.get('inns')
-        count = data.get('count')
+    def validate(self, attrs):
+        inns = attrs.get('inns')
+        count = attrs.get('count')
+        equipment_type = attrs.get('type')
+        specification = attrs.get('specification')
+
+        # Проверяем что спецификация принадлежит этому типу
+        if specification and specification.type != equipment_type:
+            raise serializers.ValidationError({
+                "specification": f"Спецификация '{specification.name}' не принадлежит типу '{equipment_type.name}'"
+            })
 
         if inns:
             if len(inns) != count:
@@ -528,14 +522,13 @@ class BulkEquipmentSerializer(serializers.Serializer):
                     "inns": f"ИНН уже существуют: {', '.join(existing)}"
                 })
 
-        return data
+        return attrs
 
     def create(self, validated_data):
         equipment_type = validated_data['type']
+        specification = validated_data.get('specification')
         name = validated_data['name']
         count = validated_data['count']
-        use_template = validated_data.get('use_template', True)
-        custom_specs = validated_data.get('specs', {})
         inns = validated_data.get('inns', [])
 
         # Всегда на главный склад
@@ -543,20 +536,8 @@ class BulkEquipmentSerializer(serializers.Serializer):
         if not main_warehouse:
             raise serializers.ValidationError("Главный склад не найден. Сначала создайте склад.")
 
-        # Получаем specs
-        specs = {}
-        if use_template:
-            try:
-                template = equipment_type.specification.template
-                # Берём дефолтные значения из шаблона
-                for key, field_def in template.items():
-                    if 'default' in field_def:
-                        specs[key] = field_def['default']
-            except EquipmentSpecification.DoesNotExist:
-                pass
-
-        # Мержим с переданными specs (они имеют приоритет)
-        specs.update(custom_specs)
+        # Получаем specs из спецификации
+        specs = specification.specs if specification else {}
 
         request = self.context.get('request')
         author = request.user if request and request.user.is_authenticated else None
