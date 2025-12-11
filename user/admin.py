@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib import messages
 from django.db import connection
+from django_tenants.utils import schema_context
 from .models import User, SupportMessage, Tenant, Domain
 
 @admin.register(User)
@@ -36,40 +38,51 @@ class UserAdmin(BaseUserAdmin):
             schema_name = obj.username.lower().replace(' ', '_')
 
             # Проверяем, не существует ли уже такой тенант
-            if not Tenant.objects.filter(schema_name=schema_name).exists():
-                # Создаём тенант
+            if Tenant.objects.filter(schema_name=schema_name).exists():
+                self.message_user(
+                    request,
+                    f"Тенант '{schema_name}' уже существует",
+                    messages.WARNING
+                )
+                return
+
+            try:
+                # Создаём тенант (схема создастся автоматически благодаря auto_create_schema=True)
                 tenant = Tenant.objects.create(
                     schema_name=schema_name,
                     name=f"{obj.first_name} {obj.last_name}".strip() or obj.username,
                     is_active=True
                 )
 
-                # Создаём домен (опционально)
+                # Создаём домен
                 Domain.objects.create(
                     domain=f"{schema_name}.imaster.uz",
                     tenant=tenant,
                     is_primary=True
                 )
 
-                # Создаём копию owner в новой схеме
-                connection.set_tenant(tenant)
-                User.objects.create(
-                    username=obj.username,
-                    email=obj.email,
-                    first_name=obj.first_name,
-                    last_name=obj.last_name,
-                    role='owner',
-                    is_active=True,
-                    password=obj.password  # Уже хешированный
-                )
-
-                # Возвращаемся в public
-                public = Tenant.objects.get(schema_name='public')
-                connection.set_tenant(public)
+                # Создаём копию owner в новой схеме используя schema_context
+                with schema_context(schema_name):
+                    User.objects.create(
+                        username=obj.username,
+                        email=obj.email,
+                        first_name=obj.first_name,
+                        last_name=obj.last_name,
+                        role='owner',
+                        is_active=True,
+                        password=obj.password  # Уже хешированный
+                    )
 
                 self.message_user(
                     request,
-                    f"Тенант '{schema_name}' создан автоматически для владельца {obj.username}"
+                    f"Тенант '{schema_name}' и владелец созданы успешно"
+                )
+
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"Ошибка при создании тенанта: {str(e)}",
+                    messages.ERROR
                 )
 
 @admin.register(SupportMessage)
